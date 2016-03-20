@@ -1,0 +1,111 @@
+#include <stdio.h>
+#include <termios.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <unistd.h>
+#include <stdlib.h>
+
+     struct termios saved_attributes;
+     
+     void
+     reset_input_mode (void)
+     {
+       tcsetattr (STDIN_FILENO, TCSANOW, &saved_attributes);
+     }
+     
+     void
+     set_input_mode (void)
+     {
+       struct termios tattr;
+       char *name;
+     
+       /* Make sure stdin is a terminal. */
+       if (!isatty (STDIN_FILENO))
+         {
+           fprintf (stderr, "Not a terminal.\n");
+           exit (EXIT_FAILURE);
+         }
+     
+       /* Save the terminal attributes so we can restore them later. */
+       tcgetattr (STDIN_FILENO, &saved_attributes);
+       atexit (reset_input_mode);
+     
+       /* Set the funny terminal modes. */
+       tcgetattr (STDIN_FILENO, &tattr);
+       tattr.c_lflag &= ~(ICANON|ECHO); /* Clear ICANON and ECHO. */
+       tattr.c_cc[VMIN] = 1;
+       tattr.c_cc[VTIME] = 0;
+       tcsetattr (STDIN_FILENO, TCSAFLUSH, &tattr);
+     }
+
+     void menu()
+{
+       printf("-----------------------------------\n");
+       printf("(1) poweroff; (2) advmenu > \n"); fflush(stdout);
+}
+
+       int main(void) {
+    	   fd_set rfds;
+   	   struct timeval tv;
+   	   int retval;
+	   char c;
+           short huhcount = 0;
+	   set_input_mode();
+
+   	   /* Watch stdin (fd 0) to see when it has input. */
+
+       while (1)
+         {
+           menu();
+   	   FD_ZERO(&rfds);
+   	   FD_SET(0, &rfds);
+	   	   /* Wait up to five seconds. */
+   	   tv.tv_sec = 20;
+   	   tv.tv_usec = 0;
+   	   retval = select(1, &rfds, NULL, NULL, &tv);
+
+	   if (retval)
+           {
+             read (STDIN_FILENO, &c, 1);
+             if (c == '1') 
+		     {
+                     printf("Are you sure? (1) \n"); fflush(stdout);
+   	             FD_ZERO(&rfds);
+   	             FD_SET(0, &rfds);
+	   	   /* Wait up to five seconds. */
+   	             tv.tv_sec = 20;
+   	             tv.tv_usec = 0;
+   	             retval = select(1, &rfds, NULL, NULL, &tv);
+		     if (retval) 
+                        {
+                        read (STDIN_FILENO, &c, 1);
+		        if (c == '1') exit(1); else exit(2);
+			}
+		     else /* return to menu if they are totally clueless */
+			{
+		        printf("timeout....\n"); fflush(stdout);
+		        exit(2);
+		        }
+	             }
+	     else if (c == '2')
+	     {
+		      exit(2);
+	     }
+	     else
+	     {
+	        printf("huh? "); fflush(stdout); 
+	        huhcount++;
+	        if (huhcount > 5) exit(2);
+	     }
+	   }
+	   else  /* timeout */
+	   {
+		   printf("timeout....\n"); fflush(stdout);
+		   exit(2);
+	   }
+         } /* while */
+     
+       return EXIT_SUCCESS;
+     
+     }
